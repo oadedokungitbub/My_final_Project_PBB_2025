@@ -1,0 +1,597 @@
+---
+title: "Gapminder Dashboard| Population, GDP per Capita & Life Expectancy (2024)"
+format: dashboard
+#| echo: false
+---
+
+```{python}
+import pandas as pd
+import plotly.express as px
+import itables
+```
+
+
+```{python}
+# Load the data Population
+pop_raw = pd.read_csv("data//pop.csv")
+# Rename the columns to more descriptive
+pop_raw = pop_raw.rename(columns={"geo": "country_code", "name": "country"})
+# Change raw data from wide to long
+pop = pop_raw.melt(id_vars=["country_code", "country"], var_name="year", value_name= "pop")
+```
+```{python}
+# Filter for year 2024
+pop['year'] = pop['year'].astype(int)
+pop_2024= pop.query("year == 2024")
+```
+```{python}
+# Compute total population in 2024
+total_pop_2024 = pop_2024["pop"].sum()
+total_global_pop_2024 = f" {total_pop_2024:,.0f}"
+```
+```{python}
+# Compute highest Population
+highest_pop = pop_2024.sort_values("pop", ascending=False).head(1).squeeze()
+highest_pop_country = highest_pop["country"]
+highest_pop_value = round(highest_pop["pop"], 1)
+highest_global_pop_value= f" {highest_pop_value:,.0f}"
+```
+```{python}
+# Compute lowest Population
+lowest_pop = pop_2024.sort_values("pop", ascending=True).head(1).squeeze()
+lowest_pop_country = lowest_pop["country"]
+lowest_pop_value = round(lowest_pop["pop"], 1)
+lowest_global_pop_value= f" {lowest_pop_value:,.0f}"
+```
+```{python}
+# Compute median population (population-weighted) 
+median_pop = pop_2024["pop"].median()
+global_median_pop = f" {median_pop:,.0f}"
+```
+```{python}
+# Compute 10 most populous countries
+top_10_pop_countries = pop_2024.nlargest(10, "pop")
+```
+```{python}
+# Compute percentage for each of these 10 countries
+top_10_pop_countries["global percent"] = (top_10_pop_countries["pop"] / total_pop_2024) * 100
+top_10_pop_countries["global percent"] = round(top_10_pop_countries["global percent"], 1)
+```
+
+
+```{python}
+# Load the data gdp_per_capita
+gdp_per_cap_raw = pd.read_csv("data//gdp_pcap.csv")
+# Rename the columns to more descriptive
+gdp_per_cap_raw = gdp_per_cap_raw.rename(columns={"geo": "country_code", "name": "country"})
+# Change raw data from wide to long
+gdp_per_cap = gdp_per_cap_raw.melt(id_vars=["country_code", "country"], var_name="year", value_name= "gdp_per_cap")
+```
+```{python}
+# Filter for year 2024
+gdp_per_cap['year'] = gdp_per_cap['year'].astype(int)
+gdp_per_cap_2024= gdp_per_cap.query("year == 2024")
+```
+```{python}
+# Compute highest GDP per Capita
+highest_gdp = gdp_per_cap_2024.sort_values("gdp_per_cap", ascending=False).head(1).squeeze()
+highest_gdp_country = highest_gdp["country"]
+highest_gdp_per_cap = round(highest_gdp["gdp_per_cap"], 1)
+highest_gdp_per_cap = f" {highest_gdp_per_cap:,.0f}"
+```
+```{python}
+# Compute lowest GDP per Capita
+lowest_gdp = gdp_per_cap_2024.sort_values("gdp_per_cap", ascending=True).head(1).squeeze()
+lowest_gdp_country = lowest_gdp["country"]
+lowest_gdp_per_cap = round(lowest_gdp["gdp_per_cap"], 1)
+lowest_gdp_per_cap = f" {lowest_gdp_per_cap:,.0f}"
+```
+
+
+```{python}
+# Load the data life_exp
+life_exp_raw = pd.read_csv("data//lex.csv")
+# Rename the columns to more descriptive
+life_exp_raw = life_exp_raw.rename(columns={"geo": "country_code", "name": "country"})
+# Change raw data from wide to long
+life_exp = life_exp_raw.melt(id_vars=["country_code", "country"], var_name= "year", value_name="lifeExp")
+```
+```{python}
+# Filter for year 2024
+life_exp["year"] = life_exp["year"].astype(int)
+life_exp_2024 = life_exp.query("year == 2024")
+# Drop any rows that couldn't be converted (NaNs)
+life_exp_2024 = life_exp_2024.dropna(subset=["lifeExp"])
+#  life expectancy column to be numeric
+life_exp_2024["lifeExp"] = life_exp_2024["lifeExp"].astype(int)
+```
+```{python}
+# Compute highest Life Expectancy
+highest_life_exp = life_exp_2024.sort_values("lifeExp", ascending=False).head(1).squeeze()
+highest_life_exp_country = highest_life_exp["country"]
+highest_life_exp_value = round(highest_life_exp["lifeExp"], 1)
+
+```
+```{python}
+# Compute lowest life expectancy
+lowest_life_exp = life_exp_2024.sort_values("lifeExp", ascending=True).head(1).squeeze()
+lowest_life_exp_country = lowest_life_exp["country"]
+lowest_life_exp_value = round(lowest_life_exp["lifeExp"], 1)
+```
+
+```{python}
+# Merge the population and GDP per Capital
+merge_gdp_pop = pd.merge(pop_2024, gdp_per_cap_2024, on = ["country", "country_code", "year"], how="inner")
+```
+```{python}
+# Merge the population and life Expectancy
+merge_life_exp_pop = pd.merge(pop_2024, life_exp_2024, on = ["country", "country_code", "year"], how="inner")
+```
+```{python}
+# Merge the GDP per Capital and life Expectancy
+merge_gdp_life_exp = pd.merge(gdp_per_cap_2024, life_exp_2024, on = ["country", "country_code", "year"], how="inner")
+```
+```{python}
+# Merge the population, GDP per Capital and life Expectancy
+merge_pop_gdp_life_exp =(
+    pop_2024
+    .merge(gdp_per_cap_2024, on=["country", "country_code", "year"], how="inner")
+    .merge(life_exp_2024, on=["country", "country_code", "year"], how="inner")
+)
+```
+
+```{python}
+# Change country codes to uppercase
+merge_pop_gdp_life_exp["country_code"] = merge_pop_gdp_life_exp["country_code"].str.upper()
+import country_converter as coco
+cc = coco.CountryConverter()
+# Create the continent column based on the 'country' column
+merge_pop_gdp_life_exp['continent'] = cc.convert(
+    names=merge_pop_gdp_life_exp['country'], 
+    to='continent'
+)
+```
+
+```{python}
+merge_pop_gdp_life_exp.loc[merge_pop_gdp_life_exp['country'].isin(["UAE", "United Arab Emirates"]), "continent"] = "Asia"
+```
+
+```{python}
+# Compute average population (population-weighted) 
+weighted_mean = (merge_pop_gdp_life_exp["pop"] * pop_2024["pop"]).sum() / pop_2024["pop"].sum()
+average_pop = round(weighted_mean, 1)
+avg_pop = merge_pop_gdp_life_exp["pop"].mean()
+global_avg_pop = f" {avg_pop:,.0f}"
+```
+```{python}
+# Compute average (population-weighted) GDP per Capita
+weighted_mean = (merge_gdp_pop["gdp_per_cap"] * merge_gdp_pop["pop"]).sum() / merge_gdp_pop["pop"].sum()
+average_gdp = round(weighted_mean, 1)
+average_gdp_per_cap = f" {average_gdp:,.0f}"
+```
+```{python}
+# Compute average (population-weighted) life expectancy
+weighted_mean = (merge_life_exp_pop["lifeExp"] * merge_life_exp_pop["pop"]).sum() / merge_life_exp_pop["pop"].sum()
+average_life_exp_value = round(weighted_mean, 1)
+```
+
+
+```{python}
+# Change country codes to uppercase
+pop_2024["country_code"] = pop_2024["country_code"].str.upper()
+# Create the map using plotly express with a twilight color scale
+map_fig_pop = px.choropleth(
+    pop_2024,
+    locations="country_code",
+    color="pop",
+    hover_name="country",
+    title="Map of Countries by Population",
+    color_continuous_scale="Twilight",
+).update_layout(coloraxis_showscale=False)
+```
+```{python}
+# Change country codes to uppercase
+gdp_per_cap_2024["country_code"] = gdp_per_cap_2024["country_code"].str.upper()
+# Create the map using plotly express with a twilight color scale
+map_fig_gdp = px.choropleth(
+    gdp_per_cap_2024,
+    locations="country_code",
+    color="gdp_per_cap",
+    hover_name="country",
+    title="Map of Countries by GDP per Capital",
+    color_continuous_scale="Twilight",
+).update_layout(coloraxis_showscale=False)
+```
+```{python}
+# Change country codes to uppercase
+life_exp_2024["country_code"] = life_exp_2024["country_code"].str.upper()
+# Create the map using plotly express with a blue color scale
+map_fig_lifeExp = px.choropleth(
+    life_exp_2024,
+    locations="country_code",
+    color="lifeExp",
+    hover_name="country",
+    title="Map of Countries by Life Expectancy",
+    color_continuous_scale="Blues",
+).update_layout(coloraxis_showscale=False)
+```
+```{python}
+#  10 most populous countries (bar chart) with a twilight color scale
+top_10_pop = pop_2024.nlargest(10, "pop").sort_values("country", ascending=True)
+bar_fig_pop = px.bar(
+    top_10_pop,
+    x="pop",
+    y="country",
+    labels={
+        "pop": "Population", 
+        "country": "Country Name"
+    },
+    title="Population of 10 most populous Countries",
+    color="country",
+    color_continuous_scale="Twilight",
+).update_layout(coloraxis_showscale=False, showlegend= False)
+```
+```{python}
+# Largest 10 countries by GDP per Capita (bar chart) with a twilight color scale
+top_10_gdp = merge_gdp_pop.nlargest(10, "pop").sort_values("gdp_per_cap", ascending=True)
+bar_fig_gdp = px.bar(
+    top_10_gdp,
+    x="gdp_per_cap",
+    y="country",
+     labels={
+        "gdp_per_cap": "GDP per Capita", 
+        "country": "Country Name"
+    },
+    title="GDP per Capita in 10 Largest Countries",
+    color="gdp_per_cap",
+    color_continuous_scale="Twilight",
+).update_layout(coloraxis_showscale=False, showlegend= False)
+```
+```{python}
+# Largest 10 countries by Life Expectancy (bar chart) with a blue color scale
+top_10_lifeExp = merge_life_exp_pop.nlargest(10, "pop").sort_values("lifeExp", ascending=True)
+bar_fig_lifeExp = px.bar(
+    top_10_lifeExp,
+    x="lifeExp",
+    y="country",
+     labels={
+        "lifeExp": "Life Expectancy", 
+        "country": "Country Name"
+    },
+    title="Life Expectancy in 10 Largest Countries",
+    color="lifeExp",
+    color_continuous_scale="Blues",
+).update_layout(coloraxis_showscale=False, showlegend= False)
+```
+
+```{python}
+# Relation scatter plot of GDP per Capita and Life Expectancy
+fig_gdp_lifeExp = px.scatter(
+    merge_gdp_life_exp, 
+    x="gdp_per_cap",           
+    y="lifeExp",               
+    hover_name="country",           
+    log_x=True,                          
+    title=" Life Expectancy Versus GDP per Capita (2024)",
+    labels={
+        "gdp_per_cap_2024": "GDP per Capita",
+        "life_exp_2024": "Life Expectancy"
+    },
+   
+)
+```
+
+```{python}
+import matplotlib.pyplot as plt
+import seaborn as sns
+plt.figure(figsize=(10, 6));
+plt.close('all');
+
+```
+
+
+# Population
+## Row 1 {height="30%"}
+
+::: {.valuebox icon="globe" color="#1e7eddff" title="Global Population in 2024"}
+
+`{python} str(total_global_pop_2024)`
+
+:::
+::: {.valuebox icon="people-fill" color="#4a78a5ff" title="Highest Population"}
+
+`{python} str(highest_global_pop_value)`
+
+`{python} highest_pop_country`
+
+:::
+::: {.valuebox icon="person-fill" color="#87CEFA" title="Lowest Population"} 
+
+`{python} str(lowest_global_pop_value)`
+
+`{python} lowest_pop_country`
+
+:::
+
+## Row 2 {height="70%"}
+### {width="60%"}
+
+```{python}
+map_fig_pop
+```
+### {width="40%"}
+
+```{python}
+bar_fig_pop
+```
+
+# GDP per Capita
+## Row 1 {height="30%"}
+
+::: {.valuebox icon="currency-dollar" color="#4a78a5ff" title="Highest GDP per Capita"}
+
+`{python} str(highest_gdp_per_cap)`
+
+`{python} highest_gdp_country`
+
+:::
+::: {.valuebox icon="currency-dollar" color="#87CEFA" title="Lowest GDP per Capita"} 
+
+`{python} str(lowest_gdp_per_cap)`
+
+`{python} lowest_gdp_country`
+
+:::
+
+::: {.valuebox  icon="file-bar-graph" color="#4682B4" title="Average GDP per Capita"}
+
+`{python} str(average_gdp_per_cap)`
+
+:::
+## Row 2 {height="70%"}
+### {width="60%"}
+
+```{python}
+map_fig_gdp
+```
+### {width="40%"}
+
+```{python}
+bar_fig_gdp
+```
+
+# Life_Expectancy
+## Row 1 {height="30%"}
+
+::: {.valuebox icon="heart" color="#4a78a5ff" title="Highest Life Expectancy"}
+
+`{python} str(highest_life_exp_value)`
+
+`{python} highest_life_exp_country`
+
+:::
+::: {.valuebox icon="heart-fill" color="#87CEFA" title="Lowest Life Expectancy"} 
+
+`{python} str(lowest_life_exp_value)`
+
+`{python} lowest_life_exp_country`
+
+:::
+
+
+::: {.valuebox  icon="bar-chart" color="#4682B4" title="Average Life Expectancy"}
+
+`{python} str(average_life_exp_value)`
+
+:::
+## Row 2 {height="70%"}
+### {width="50%"}
+
+```{python}
+map_fig_lifeExp
+```
+### {width="50%"}
+
+```{python}
+bar_fig_lifeExp
+```
+
+
+# Regional GDP per Capita 
+
+## Row 1 {height="50%"}
+
+```{python}
+# Create regional summary
+reg_sum_gdp = (
+    merge_pop_gdp_life_exp.groupby("continent")
+    .apply(
+        lambda g: pd.Series(
+            {
+                "Average GDP per Cap": g["gdp_per_cap"].mean(),
+                "Lowest GDP per Cap": g["gdp_per_cap"].min(),
+                "Country with Lowest GDP per Cap": g.loc[g["gdp_per_cap"].idxmin(), "country"],
+                "Highest GDP per Cap": g["gdp_per_cap"].max(),
+                "Country with Highest GDP per Cap": g.loc[
+                    g["gdp_per_cap"].idxmax(), "country"
+                ],
+            }
+        )
+    )
+    .round(2)
+)
+
+itables.show(reg_sum_gdp, dom='t', column_filters=False)
+```
+
+## Row 2 {height=50%}
+### Column {width=70%}
+```{python}
+continent_fig_gdp = px.box(
+    merge_pop_gdp_life_exp,
+    x="continent",
+    y="gdp_per_cap",
+    color="continent",
+    title="Distribution of GDP per Capita by Continent",
+    points="all",  # This shows all data points
+    hover_data=["country"],  # This adds country names to hover info
+    color_discrete_sequence=px.colors.sequential.Turbo,  # Built-in Blues palette
+).update_layout(
+    showlegend=False, xaxis_title="Continent", yaxis_title="GDP per Capita (USD)"
+)
+continent_fig_gdp
+```
+
+### Column {width=30%}
+Africa shows markedly lower GDP per capita from the figures compared to other continents, reflecting significant poor economic situations.
+
+Europe and Oceania demonstrate the most consistently high GDP per capital, while Asia and the Americas show greater variability, indicating diverse development stages within these regions.
+
+# Regional Life Expectancy
+
+## Row 1 {height="50%"}
+
+```{python}
+# Create regional summary
+#| echo: false
+reg_sum_lifeExp = (
+    merge_pop_gdp_life_exp.groupby("continent")
+    .apply(
+        lambda g: pd.Series(
+            {
+                "Average Life Expectancy": g["lifeExp"].mean(),
+                "Lowest Life Expectancy": g["lifeExp"].min(),
+                "Country with Lowest Life Expectancy": g.loc[g["lifeExp"].idxmin(), "country"],
+                "Highest Life Expectancy": g["lifeExp"].max(),
+                "Country with Highest Life Expectancy": g.loc[
+                    g["lifeExp"].idxmax(), "country"
+                ],
+            }
+        )
+    )
+    .round(2)
+)
+
+itables.show(reg_sum_lifeExp, dom='t', column_filters=False)
+```
+
+## Row 2 {height= 50%}
+### Column {width=70%}
+```{python}
+continent_fig_lifeExp = px.box(
+    merge_pop_gdp_life_exp,
+    x="continent",
+    y="lifeExp",
+    color="continent",
+    title="Distribution of Life Expectancy by Continent",
+    points="all",  # This shows all data points
+    hover_data=["country"],  # This adds country names to hover info
+    color_discrete_sequence=px.colors.sequential.Turbo,  # Built-in Blues palette
+).update_layout(
+    showlegend=False, xaxis_title="Continent", yaxis_title="Life Expectancy (years)"
+)
+continent_fig_lifeExp
+```
+
+### Column {width=30%}
+Africa shows markedly lower life expectancy in the figures compared to other continents, reflecting significant developmental issues.
+
+Europe and Oceania demonstrate the most consistently high life expectancies, while Asia and the Americas show greater variability, indicating diverse development stages within these regions.
+
+
+# Population, GDP per Capita & Life Expectancy
+## Row 1 {height="30%"}
+
+::: {.valuebox  icon="bar-chart" color="#4682B4" title="Median Global Population"}
+
+`{python} str(global_median_pop)`
+
+:::
+
+::: {.valuebox  icon="globe" color="#4682B4" title="Average Global Population"}
+
+`{python} str(global_avg_pop )`
+
+:::
+
+::: {.valuebox  icon="file-bar-graph" color="#4682B4" title="Average GDP per Capita"}
+
+`{python} str(average_gdp_per_cap)`
+
+:::
+
+
+::: {.valuebox  icon="bar-chart" color="#4682B4" title="Average Life Expectancy"}
+
+`{python} str(average_life_exp_value)`
+
+:::
+## Row 2 {height="70%"}
+### {width = "40%"}
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+
+# Create the plot
+sns.scatterplot(
+    data=merge_gdp_life_exp,
+    x="gdp_per_cap",
+    y="lifeExp",
+    alpha=0.6
+)
+# Set the X axis to log scale
+plt.xscale('log')
+
+# Adding labels using LaTeX formatting
+plt.title("Relationship between GDP per Capita and Life Expectancy")
+plt.xlabel(r"Log Scale: GDP per Capita (USD)")
+plt.ylabel(r"Life Expectancy (Years)")
+plt.grid(True, which="both", ls="-", alpha=0.2);
+```
+
+
+### {width = 40%}
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+
+# Create the plot
+sns.scatterplot(
+    data=merge_pop_gdp_life_exp,
+    x="gdp_per_cap",
+    y="lifeExp",
+    size="pop",    
+    hue="pop",     
+    sizes=(20, 2000),    
+    alpha=0.6,
+    palette="viridis"
+)   
+
+plt.xscale('log')
+plt.title(r"Relationship between GDP per Capita and Life Expectancy")
+plt.xlabel(r"Log Scale: GDP per Capita(USD)")
+plt.ylabel(r"Life Expectancy (Years)")
+plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left');
+```
+
+# Data Download
+
+```{python}
+#| echo: false
+# Display full dataset with itables
+itables.show(merge_pop_gdp_life_exp, caption="Gapminder Dataset for Poulation, GDP per Capita, Life Expectancy and Continent (2024)", buttons=["csvHtml5"])
+```
+
+
+# About
+This data comes from the python `plotly.express` `matplotlib` `seaborn` library’s 
+`gapminder` dataset, which is originally sourced from the Gapminder Foundation.
+
+The Gapminder Foundation is a non-profit venture that promotes sustainable global development and achievement of the United Nations Millennium Development Goals by increasing use and understanding of statistics and other information about social, economic, and environmental development.
+
+**Watch Hans Rosling’s TED Talk:**
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/hVimVzgtD6w?si=dKHepC5EXhjaXOe2" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
